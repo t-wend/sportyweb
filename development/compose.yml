@@ -1,0 +1,55 @@
+x-podman:
+  in_pod: false
+
+
+services:
+  # The development container running the app
+  sportyweb-dev:
+    #container_name: ${DEV_CONTAINER_NAME:-dc-sportyweb-dev}
+    container_name: sportyweb-dev
+    image: localhost/sportyweb-dev:latest
+    # Rootless mode UID/GID Mapping
+    # UID/GID has to match the user in the Containerfile
+    userns_mode: "keep-id:uid=1000,gid=1000"  
+    build:
+      context: .
+      target: swdev
+      dockerfile: Containerfile
+
+    volumes:
+      # Home folder of the user, keeps command history
+      - workspaces:/workspaces
+      # Mounts the folder of the repository on the host to the container
+      - ../:/workspaces/sportyweb
+     
+      # uses the customizable env file created, if there is none, copy and adjust the template
+    env_file:
+      - dev.env
+    environment:
+      # Used to detect if a its a container
+      IN_CONTAINER: "true"
+      # If this var exists, the webserver binds to 0.0.0.0 inside the container, instead of 127.0.0.1
+      #  which would not be accessible by a browser on the host
+      SW_LISTEN_ANY: "true"
+
+    # Binds only to localhost, so the webserver is not reachable from other machines
+    ports:
+      - target: 4000
+        published: 4000
+        host_ip: 127.0.0.1
+
+  # The container running the database
+  postgresql:
+    # has to match version with postgresql-client from the development container
+    image: docker.io/library/postgres:15.19-trixie 
+    restart: unless-stopped
+    volumes:
+      - sportyweb-db:/var/lib/postgresql
+    env_file:
+      - dev.env
+
+
+# Named volumes
+volumes:
+  sportyweb-db:
+  workspaces:

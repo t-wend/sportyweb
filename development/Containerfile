@@ -1,0 +1,106 @@
+# beschreibung
+
+# Official image for elixir, based on erlang and debian
+FROM docker.io/library/elixir:1.18.4-otp-27 AS swbase
+# Please add the elixir version to the .env files!
+
+
+# Prevents dialogs asking for user presence while installing packages with apt
+ENV DEBIAN_FRONTEND=noninteractive
+
+
+# Sets the user for the following commands to 'root'.
+# It's the default behavior and here only for clarification.
+USER root
+
+# General dependencies 
+# inotify-tools is recommended be installed for phoenix
+# build-essential is a meta package to compile c,
+#   its required for the elixir package "argon2_elixir"
+RUN apt update && apt-get install -y --no-install-recommends \
+    inotify-tools \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+
+
+# Dependencies for the document-management-module
+# imagemagick: generates thumbnails;
+# ocrmypdf: enables full-text search on scanned files
+# poppler-utils: 
+RUN apt update && apt-get install -y --no-install-recommends \
+    imagemagick \ 
+    ocrmypdf \
+    poppler-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+# Exposes the port to be used by the webserver
+EXPOSE 4000
+
+
+
+# Sets args for the development user created in the next step
+ARG USERNAME=sportyweb
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+# Creates the user that is used for development activities
+RUN groupadd --gid $USER_GID $USERNAME && \
+    useradd --uid $USER_UID --gid $USER_GID -m -d /workspaces -s /bin/bash $USERNAME
+
+
+USER $USERNAME
+
+WORKDIR /workspaces
+
+###########################################################
+#
+# Development Container
+#
+FROM swbase AS swdev
+
+# switching temporarily back to root
+USER root
+
+# Development specific packages
+# bash-completion adds autocomplete features to the bash shell
+# postgresql-client to provide the commands "psql" or "pg_dump"
+# nano is a small editor to quickly change files outside the workspace, inside the container
+RUN apt update && apt-get install -y --no-install-recommends \
+    bash-completion \
+    postgresql-client \
+    nano \
+    && rm -rf /var/lib/apt/lists/*
+
+
+
+
+
+# switching back to the unprivileged user
+ARG USERNAME=sportyweb
+USER $USERNAME
+
+RUN echo "source /workspaces/sportyweb/swdev-helper.sh > /dev/null " >> /workspaces/.bashrc
+
+
+
+# starts a dummy-process so the container is running, 
+# even when the webserver is not started.
+# 
+STOPSIGNAL SIGKILL
+CMD [ "sleep", "infinity" ]
+
+
+
+FROM swbase AS swprod
+
+# Download sportyweb release
+# RUN ...
+
+ENV PHX_SERVER=true
+ENV MIX_ENV=prod
+
+
+# starts the webserver
+# 
+#CMD [ "/path/to/webserver", "infinity" ]

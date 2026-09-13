@@ -20,6 +20,41 @@ if System.get_env("PHX_SERVER") do
   config :sportyweb, SportywebWeb.Endpoint, server: true
 end
 
+
+if config_env() == :dev do
+  config :sportyweb, Sportyweb.Repo,
+    username: System.get_env("POSTGRES_USER") || "postgres",
+    password: System.get_env("POSTGRES_PASSWORD") || "postgres",
+    hostname: System.get_env("POSTGRES_HOST") || "localhost",
+    database: System.get_env("POSTGRES_DB") || "sportyweb_dev"
+
+  config :sportyweb, SportywebWeb.Endpoint,
+    secret_key_base: System.get_env("SECRET_KEY_BASE") || "G051RebLdWoDTyvJo1E7pZ96+slc5o4zZdnsaLW0sMmARFu6r1P6eCQGbS88f7j7",
+    http: [
+      port: System.get_env("SW_LISTEN_PORT") || 4000
+    ]
+
+  if System.get_env("SW_LISTEN_ANY") do
+    config :sportyweb, SportywebWeb.Endpoint,
+      http: [
+        ip: :any
+      ]
+  end
+end
+
+
+if config_env() == :test do
+  config :sportyweb, Sportyweb.Repo,
+    username: System.get_env("POSTGRES_USER") || "postgres",
+    password: System.get_env("POSTGRES_PASSWORD") || "postgres",
+    hostname: System.get_env("POSTGRES_HOST") || "localhost",
+    database: System.get_env("POSTGRES_TEST_DB") || "sportyweb_test"
+
+  config :sportyweb, SportywebWeb.Endpoint,
+    secret_key_base: System.get_env("SECRET_KEY_BASE") || "fH9HRTYVgiMUk9NjqDHFf8k2i01CU7AunnUkpx0oI9UTmT36zccjsEJrORu0TIWV"
+end
+
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

@@ -176,3 +176,9 @@ npm-debug.log
 # recreate both with each setup-dev-env.sh run
 /priv/repo/structure.sql
 /documents/erd.pdf
+/documents/ecto_erd.mmd
+
+# ##################################################
+# Development environment sepcific
+
+/development/dev.env

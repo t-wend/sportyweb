@@ -1,0 +1,8 @@
+// Please take a look at the development/README.md
+{
+  "name": "devcontainer-sportyweb",
+  "dockerComposeFile": "../development/compose.yml",
+  "service": "sportyweb-dev",
+  "workspaceFolder": "/workspaces/sportyweb"
+}
+
