@@ -181,4 +181,4 @@ npm-debug.log
 # ##################################################
 # Development environment sepcific
 
-/development/dev.env
+/development/.env

@@ -34,12 +34,45 @@ if config_env() == :dev do
       port: System.get_env("SW_LISTEN_PORT") || 4000
     ]
 
+  # If the var exists, binds any, otherwise localhost
   if System.get_env("SW_LISTEN_ANY") do
     config :sportyweb, SportywebWeb.Endpoint,
       http: [
         ip: :any
       ]
   end
+
+# Not working, Sportyweb.Documents needs to be configured in config.exs
+  # Path to store the uploaded documents
+# config :sportyweb, Sportyweb.Documents,
+#   upload_dir: System.get_env("DOCUMENT_PATH") || "otherdir/documents"
+
+
+
+
+# Configure sportyweb to use S3 instead of a local dir to store documents
+if System.get_env("USE_S3_STORAGE") do
+
+#  Not working, Sportyweb.Documents needs to be configured in config.exs
+#    config :sportyweb, Sportyweb.Documents,
+#      storage_backend: Sportyweb.Documents.Storage.S3, 
+#      s3_bucket: System.get_env("S3_BUCKET") || "mybucket" 
+
+    config :ex_aws,
+      access_key_id: System.get_env("S3_ACCESS_KEY") || "",
+      secret_access_key: System.get_env("S3_SECRET_KEY") || "",
+      region: System.get_env("S3_REGION") || "eu-central", 
+      s3: [
+        scheme: System.get_env("S3_SCHEME") || "https://",
+        port: System.get_env("S3_PORT") || "443",
+        host: System.get_env("S3_HOST") || "fsn1.your-objectstorage.com",
+        region: System.get_env("S3_REGION")|| "eu-central",
+        path_style: System.get_env("S3_PATH_STYLE") || true 
+      ]
+  end
+
+
+
 end
 
 

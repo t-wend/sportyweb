@@ -17,7 +17,7 @@
 #		     then run a command like './swdev.sh help'
 #		2. jump straight into sportyweb development:
 #				'./swdev.sh init'
-#			When 'USE_DEV_CONTAINER=true' is set in development/dev.env (default), 
+#			When 'USE_CONTAINER=true' is set in development/dev.env (default), 
 #			this checks requirements, creates an image, runs it,
 #			fetches elixir dependencies, compiles them, creates and 
 #			seeds the db and finally starts the webserver.
@@ -38,8 +38,10 @@
 #                          - Main script: settings, vars, ....
 #
 #                                                   
-
-
+#       Meaning of the comments above the functions:
+#                       - any: use on host or in container  
+#                       - CH: use on host with USE_CONTAINER=true 
+#                       - SW: use where sportyweb runs
 ###########################################################################
 #
 #		Check System Requirements
@@ -49,6 +51,8 @@
 #
 #	Requirements for sportyweb
 #
+
+# SW - Checks if required commands for Sportyweb are available
 check-required-packages() {
     read -r -a req_packages <<< $REQUIRED_PACKAGES
     for p in "${req_packages[@]}"
@@ -62,7 +66,7 @@ check-required-packages() {
 
 }
 
-#
+# SW - Checks if elixir is available in the correct version
 check-elixir() {
 
 	if ! command -v iex &> /dev/null
@@ -80,6 +84,7 @@ check-elixir() {
 	fi
 }
 
+# SW - Checks if commands from recommended packages are available
 check-recommended-packages() {
     read -r -a rec_packages <<< $RECOMMENDED_PACKAGES
 
@@ -97,7 +102,7 @@ check-recommended-packages() {
 #	Container based environment
 #
 
-# Check if either podman or docker is installed
+# CH - Check if either podman or docker is installed
 check-con-engine() {
     if ! command -v podman &> /dev/null
     then
@@ -109,7 +114,7 @@ check-con-engine() {
     fi
 }
 
-# Check if podman-compose or docker-compose is installed
+# CH - Check if podman-compose or docker-compose is installed
 check-con-compose() {
     if ! command -v podman-compose &> /dev/null
     then
@@ -121,25 +126,18 @@ check-con-compose() {
     fi
 }
 
+# any - Check if containers should be used
 check-con-enabled() {
     if [[ "$IN_CONTAINER" == "true" ]]
     then
         echo "ERROR Function is run inside the container, but has to run on the host! Aborting..."
         return 1
     fi
-    if [[ $USE_DEV_CONTAINER != "true" ]]
+    if [[ $USE_CONTAINER != "true" ]]
     then
-        echo "ERROR the container-based environment is disabled in the $ENV_FILE_DEV file!"
+        echo "ERROR the container-based environment is disabled in the $CURRENT_ENV_FILE file!"
         return 1
     fi
-}
-
-
-# check if the requirements for sportyweb are met inside the container
-check-con-sw-required() {
-    check-con-dev-running
-    echo "COMMAND_TO_CON: $COMMAND_TO_CON"
-    $COMMAND_TO_CON ./$SCRIPT_FILE check-sw-required
 }
 
 
@@ -147,9 +145,9 @@ check-con-sw-required() {
 #	Wrapper
 #
 
-# check if the requirements for sportyweb are met
+# SW - Check if the requirements for sportyweb are met
 check-sw-required() {
-    if [[ "$USE_DEV_CONTAINER" = true ]]
+    if [[ "$USE_CONTAINER" = true ]]
     then
         if [[ ! "$IN_CONTAINER" = true ]]
         then
@@ -157,8 +155,8 @@ check-sw-required() {
             #   - Development containers should be used
             #   AND
             #   - the script is run on the host
-            echo "WARNING USE_DEV_CONTAINER is set to true and this function (check-sw-required) should be run in the container, but is run on the host."
-            return 0
+            echo "WARNING USE_CONTAINER is set to true and this function should be run in the container, but is run on the host."
+            return 1
         fi
     fi
 
@@ -168,7 +166,7 @@ check-sw-required() {
 }
 
 
-# check if the requirements for the container based environment are met.
+# CH - check if the requirements for containers are met.
 check-con-required() {
     check-con-enabled
     check-con-engine
@@ -187,6 +185,7 @@ check-con-required() {
 #   Checks
 #
 
+# CH - check if the image exists
 check-con-dev-image() {
     check-con-required
     if ! $CONTAINER_TOOL image inspect $DEV_IMAGE_NAME > /dev/null
@@ -196,13 +195,14 @@ check-con-dev-image() {
 	fi
 }
 
+# CH - check if the container is running
 check-con-dev-running() {
     check-con-dev-image
     #echo "INFO: Expected container name: $DEV_CONTAINER_NAME"
 
     if  ! $CONTAINER_TOOL ps --filter name=$DEV_CONTAINER_NAME --filter status=running --format={{.Names}} | grep $DEV_CONTAINER_NAME > /dev/null 2>&1
     then
-		echo "ERROR Container for development is not running, start with '$SCRIPT_ALIAS up'"
+		echo "ERROR Container for development is not running, start with './sw-dev up'"
 		return 1
 	fi
 }
@@ -211,6 +211,7 @@ check-con-dev-running() {
 #   Build Images
 #
 
+# CH - Build the container
 con-build-dev() {
     check-con-required
     echo "INFO Building the development container...."
@@ -227,41 +228,43 @@ con-build-dev() {
 #   Usage/Management
 #
 
+# CH - Start the containers
 up() {
     check-con-dev-image
-    $CONTAINER_TOOL compose -f $COMPOSE_FILE_PATH up -d
+    $COMPOSE_PROVIDER -f $COMPOSE_FILE_PATH up -d $COMPOSE_SERVICES
 }
 
 
-
+# CH - Stop all containers and remove them
 down() {
     check-con-dev-image
     #check-con-dev-running
-    $CONTAINER_TOOL compose -f $COMPOSE_FILE_PATH down
+    $COMPOSE_PROVIDER -f $COMPOSE_FILE_PATH down
 }
 
-
+# CH - Restart all containers
 restart() {
     check-con-dev-image
-    $CONTAINER_TOOL compose -f $COMPOSE_FILE_PATH restart
+    $COMPOSE_PROVIDER -f $COMPOSE_FILE_PATH restart $COMPOSE_SERVICES
 }	
 
-
+# CH - Start a shell inside the container
 enter() {
     check-con-dev-running
     $CONTAINER_TOOL exec -w /workspaces/sportyweb -it $DEV_CONTAINER_NAME /bin/bash 
-    #$CONTAINER_TOOL compose -f ./development/compose.yml exec -w /workspaces/sportyweb sportyweb-dev bash 
+    #$COMPOSE_PROVIDER -f ./development/compose.yml exec -w /workspaces/sportyweb sportyweb-dev bash 
 }
 
+# CH - Start a root shell inside the container
 enter-root() {
     check-con-dev-running
     $CONTAINER_TOOL exec -w /workspaces/sportyweb -it --user root $DEV_CONTAINER_NAME /bin/bash 
-    #$CONTAINER_TOOL compose -f ./development/compose.yml exec -w /workspaces/sportyweb sportyweb-dev bash 
+    #$COMPOSE_PROVIDER -f ./development/compose.yml exec -w /workspaces/sportyweb sportyweb-dev bash 
 }
 
-# Sends a command to the development container
+# CH - Sends a command passed as arg ($*) to the development container
 con-cmd() {
-
+    check-con-dev-running
     $COMMAND_TO_CON bash -c "$*"
 }
 
@@ -273,53 +276,82 @@ con-cmd() {
 #
 ###########################################################################
 
-# Creates the environment var file, that can be changed by the user
+# any - Creates the .env file with randomly generated secrets, that can be changed by the user
 create-devenvfile() {
-    if [[ ! -f $SCRIPTDIR/$ENV_FILE_DEV ]]
+    if [[ ! -f $SCRIPTDIR/$CURRENT_ENV_FILE ]]
     then
-    echo "cp $SCRIPTDIR/$ENV_FILE_TEMPLATE $SCRIPTDIR/$ENV_FILE_DEV"
-    cp $SCRIPTDIR/$ENV_FILE_TEMPLATE $SCRIPTDIR/$ENV_FILE_DEV
-    echo "INFO $SCRIPTDIR/$ENV_FILE_DEV created"
+        echo "cp $SCRIPTDIR/$ENV_FILE_TEMPLATE $SCRIPTDIR/$CURRENT_ENV_FILE"
+        cp $SCRIPTDIR/$ENV_FILE_TEMPLATE $SCRIPTDIR/$CURRENT_ENV_FILE
+        echo "INFO $SCRIPTDIR/$CURRENT_ENV_FILE created"
 
-    # Generates a 64 characters long secret and stores it in the $ENV_FILE_DEV
-    #sed -i "s~^$1=.*~SECRET_KEY_BASE=$(mix phx.gen.secret)~g" $SCRIPTDIR/$ENV_FILE_DEV
-    NEW_SECRET=$(LC_ALL=C openssl rand --base64 64 | sed -n '1p' | cut -c -64)
-    sed -i "s~^#SECRET_KEY_BASE=.*~SECRET_KEY_BASE=$NEW_SECRET~g" $SCRIPTDIR/$ENV_FILE_DEV
-    echo "INFO Secret generated in $SCRIPTDIR/$ENV_FILE_DEV"
+        # Generates a 64 characters long secret
+        NEW_SECRET=$(LC_ALL=C openssl rand --base64 64 | sed -n '1p' | cut -c -64)
+        # Replaces the value of SECRET_KEY_BASE
+        sed -i "s~^#SECRET_KEY_BASE=.*~SECRET_KEY_BASE=$NEW_SECRET~g" $SCRIPTDIR/$CURRENT_ENV_FILE
+        
+        NEW_SECRET=$(LC_ALL=C openssl rand --base64 64 | sed -n '1p' | cut -c -64)
+        # Replaces the value of S3_SECRET_KEY
+        sed -i "s~^#S3_SECRET_KEY=.*~S3_SECRET_KEY=$NEW_SECRET~g" $SCRIPTDIR/$CURRENT_ENV_FILE
+        
+        echo "INFO Secrets generated in $SCRIPTDIR/$CURRENT_ENV_FILE"
 
     else
-        echo "INFO $SCRIPTDIR/$ENV_FILE_DEV exists already... Doing nothing..."
+        echo "INFO $SCRIPTDIR/$CURRENT_ENV_FILE exists already... Doing nothing..."
     fi
 }
 
 
 
-
-con-generate-erd() {
-    check-con-dev-running
-    $COMMAND_TO_CON mix ecto.gen.erd --output-path=documents/ecto_erd.mmd
-    
-    # Uses mermaid-cli to generate an erd from the previously generated .mmd
-    # https://github.com/mermaid-js/mermaid-cli
-    if [[ "$CONTAINER_TOOL" == "podman" ]]
+# any - generates an ERD
+generate-erd() {
+    # https://hexdocs.pm/ecto_erd/Mix.Tasks.Ecto.Gen.Erd.html#module-mermaid
+    if [[ "$USE_CONTAINER" = true ]]
     then
-        podman run --userns keep-id --user ${UID} --rm -v $SCRIPTDIR/documents:/data:z ghcr.io/mermaid-js/mermaid-cli/mermaid-cli -i ecto_erd.mmd -o erd.pdf
-    elif [[ "$CONTAINER_TOOL" == "docker" ]]
+        if [[ ! "$IN_CONTAINER" = true ]]
+        then
+            # This is executed when:
+            #   - Development containers should be used
+            #   AND
+            #   - the script is run on the host
+            check-con-dev-running
+            $COMMAND_TO_CON mix ecto.gen.erd --output-path=documents/ecto_erd.mmd
+            
+            # Uses mermaid-cli to generate an erd from the previously generated .mmd
+            # https://github.com/mermaid-js/mermaid-cli
+            if [[ "$CONTAINER_TOOL" == "podman" ]]
+            then
+                podman run --userns keep-id --user ${UID} --rm -v $SCRIPTDIR/documents:/data:z ghcr.io/mermaid-js/mermaid-cli/mermaid-cli -i ecto_erd.mmd -o erd.pdf
+            elif [[ "$CONTAINER_TOOL" == "docker" ]]
+            then
+                docker run --rm -u `id -u`:`id -g` -v $SCRIPTDIR/documents:/data minlag/mermaid-cli -i ecto_erd.mmd -o erd.pdf
+            else
+                echo "ERROR $CONTAINER_TOOL must be 'podman' or 'docker'"
+                rm $SCRIPTDIR/documents/ecto_erd.mmd
+                return 1
+            fi
+            rm $SCRIPTDIR/documents/ecto_erd.mmd
+            echo "INFO: You can now view documents/erd.pdf"
+            return 0
+        fi
+    fi
+    if command -v mmdc &> /dev/null
     then
-        docker run --rm -u `id -u`:`id -g` -v $SCRIPTDIR/documents:/data minlag/mermaid-cli -i ecto_erd.mmd -o erd.pdf
+        mix ecto.gen.erd --output-path=ecto_erd.mmd && mmdc -i ecto_erd.mmd -o documents/erd.pdf
+        rm ecto_erd.mmd
+        echo "INFO: You can now view documents/erd.pdf"
+        return 0
     else
-        echo "ERROR $CONTAINER_TOOL must be 'podman' or 'docker'"
-        rm $SCRIPTDIR/documents/ecto_erd.mmd
+        echo "WARNING: Can't generate an ERD!"
+        echo "         Please run this on the host or"
+        echo "         install mermaid-cli (https://github.com/mermaid-js/mermaid-cli)"
         return 1
     fi
-    rm $SCRIPTDIR/documents/ecto_erd.mmd
-    echo "INFO: You can now view documents/erd.pdf"
+
 }
 
 
 
-# asks for user confirmation if some commands are not run in the
-#  project directory.
+# any - asks for user confirmation if some commands are not run in the project directory.
 check-scriptdir() {
     if [[ ! $SCRIPTDIR == *"sportyweb"* ]]
     then
@@ -335,11 +367,20 @@ check-scriptdir() {
 }
 
 
-# help
-# ToDo
+# any - Shows available functions
 help() {
-    FUNCTION_LIST=$(grep -o "^[a-zA-Z-]*() {" "$SCRIPT_FILE" | sed 's/[^a-zA-Z-]//g' )
-    echo $FUNCTION_LIST
+    echo "Meaning of the comments above the functions:
+            - any: use on host or in container  
+            - CH: use on host with USE_CONTAINER=true 
+            - SW: use where sportyweb runs"
+
+
+    grep -B 1 "^[a-zA-Z-]*() {" "$SCRIPT_FILE" | sed 's-() {--g'
+
+    echo "Meaning of the comments above the functions:
+            - any: use on host or in container  
+            - CH: use on host with USE_CONTAINER=true 
+            - SW: use where sportyweb runs"
 }
 
 
@@ -350,75 +391,77 @@ help() {
 #			
 ###########################################################################
 
-#TODO benennung?
-clean-system-db() {
+# SW - Drop databases with Ecto
+clean-db() {
     check-sw-required
     echo "INFO Dropping test and dev databases"
     MIX_ENV=dev mix ecto.drop
     MIX_ENV=test mix ecto.drop
 }
 
+# CH - Stop all containers, remoe them including named Volumes!
 clean-con-dev() {
     check-con-required
     echo "INFO Removing containers, including named volumes"
-    $CONTAINER_TOOL compose -f $COMPOSE_FILE_PATH down -v   # "-v" drops volumes (db, /workspaces) TODO DAS TESTEN
+    $COMPOSE_PROVIDER -f $COMPOSE_FILE_PATH down -v # "-v" drops volumes (db, /workspaces) TODO DAS TESTEN
 	
 }
 
+# CH - Remove the image
 clean-image-dev() {
     check-con-required
     echo "INFO Removing image $DEV_IMAGE_NAME:$DEV_IMAGE_TAG"
     $CONTAINER_TOOL image rm $DEV_IMAGE_NAME:$DEV_IMAGE_TAG
 }
 
-#TODO full path? IGNORE
-clean-mixbuildcache() {
+# any - Remove _build, deps, uploads and doc dirs
+clean-data() {
     echo "INFO Trying to remove:
                         $SCRIPTDIR/_build
                         $SCRIPTDIR/deps
+                        $SCRIPTDIR/uploads
+                        $SCRIPTDIR/doc
     "
     check-scriptdir
     rm -rf $SCRIPTDIR/_build
     rm -rf $SCRIPTDIR/deps
+    rm -rf $SCRIPTDIR/uploads
+    rm -rf $SCRIPTDIR/doc
     echo "INFO removed folders (if they existed)."
 }
 
+# any - Delete .env
 clean-devenvfile() {
     echo "INFO Trying to remove:
-                        $SCRIPTDIR/$ENV_FILE_DEV
+                        $SCRIPTDIR/$CURRENT_ENV_FILE
     "
     check-scriptdir
-    rm $SCRIPTDIR/$ENV_FILE_DEV
-    echo "INFO removed $SCRIPTDIR/$ENV_FILE_DEV."
+    rm $SCRIPTDIR/$CURRENT_ENV_FILE
+    echo "INFO removed $SCRIPTDIR/$CURRENT_ENV_FILE."
 }
 
 #
 #   Wrapper
 #
 
-clean-all() {
-    if [[ "$IN_CONTAINER" == "true" ]]
+# any - Remove created data
+clean() {
+    if [[ "$USE_CONTAINER" = true ]]
     then
-        #echo "INFO Cleaning inside the container, ecto.drop, deleting _build deps dev.env"
-        clean-system-db
-        clean-mixbuildcache
-        clean-devenvfile
-        return 0
+        if [[ ! "$IN_CONTAINER" = true ]]
+        then
+            # This is executed when:
+            #   - Development containers should be used
+            #   AND
+            #   - the script is run on the host
+            clean-con-dev
+            clean-image-dev
+            clean-data
+            return 0
+        fi
     fi
-
-    if [[ $USE_DEV_CONTAINER == "true" ]]
-    then
-        #echo "INFO Cleaning clean-con clean-devenvfile"
-        clean-con-dev
-        clean-image-dev
-        clean-mixbuildcache
-        clean-devenvfile
-        
-    else
-        #echo "INFO Cleaning clean-mixbuildcache clean-devenvfile"
-        clean-devenvfile
-        clean-mixbuildcache
-    fi
+    clean-db
+    clean-data
 }
 
 
@@ -429,13 +472,10 @@ clean-all() {
 #
 ###########################################################################
 
-
+# any - Setup the development environment
 init() {
     echo "INFO: Initialising setup..."
-    
-    
-    
-    if [[ "$USE_DEV_CONTAINER" = true ]]
+    if [[ "$USE_CONTAINER" = true ]]
     then
         if [[ ! "$IN_CONTAINER" = true ]]
         then
@@ -451,23 +491,21 @@ init() {
     #   - the script is run inside a container
     #   OR
     #   - the script is run on the host and development containers should not be used
-   
     init-test
     init-dev
-    echo "INFO Starting webserver..."
+    echo "INFO: Starting webserver..."# SW - Setup the mix environment in MIX_ENV=dev
     mix phx.server
 }
 
 
 
-
+# CH - Setup the container based development environment
 init-con() {
     echo "INFO: Setting up the development container..."  
     check-con-required
-    #create-devenvfile
     con-build-dev
     up
-    check-con-sw-required
+    con-cmd "/workspaces/sportyweb/$SCRIPT_FILE check-sw-required"
     con-cmd "/workspaces/sportyweb/$SCRIPT_FILE init-dev"
     con-cmd "/workspaces/sportyweb/$SCRIPT_FILE init-test"
     con-cmd "/workspaces/sportyweb/$SCRIPT_FILE mix phx.server"
@@ -475,26 +513,40 @@ init-con() {
 }
 
 
+# SW - Setup the mix environment, $1 should be "dev" or "test"
+init-mixenv() {
+    echo "INFO: Setting up the MIX_ENV=$1 environment..."
+    check-sw-required
+
+    MIX_ENV=$1 mix deps.get
+
+    MIX_ENV=$1 mix assets.setup
+    MIX_ENV=$1 mix assets.build
+
+    echo "INFO Drop $1 database "
+    MIX_ENV=$1 mix ecto.drop
+
+    echo "INFO Create $1 database"
+    MIX_ENV=$1 mix ecto.create
+
+    echo "INFO Run $1 database migrations"
+    MIX_ENV=$1 mix ecto.migrate
+   
+}
 
 
+# SW - Setup the mix environment MIX_ENV=dev
 init-dev() {
     echo "INFO: Setting up the development environment..."
     check-sw-required
 
+    # create S3 Bucket if it doesnt exists
+    if [[ $USE_S3_STORAGE == "true" ]]
+    then
+        aws s3api create-bucket --bucket $S3_BUCKET --endpoint-url http://s3:9000
+    fi
  
-    mix deps.get
-
-    mix assets.setup
-    mix assets.build
-
-    echo "INFO Drop dev database "
-    mix ecto.drop
-
-    echo "INFO Create dev database"
-    mix ecto.create
-
-    echo "INFO Run dev database migrations"
-    mix ecto.migrate
+    init-mixenv "dev"
 
     echo "INFO Generate a dump of the SQL structure"
     mix ecto.dump
@@ -510,34 +562,17 @@ init-dev() {
     
 }
 
-
-
-
-# 
+# SW - Setup the mix environment MIX_ENV=test
 init-test() {
     echo "INFO: Setting up the test environment..."
     check-sw-required
-    #create-devenvfile
-    
-
-    echo "INFO Downloading dependencies"
-    MIX_ENV=test mix deps.get
-
-    echo "INFO Drop test database "
-    MIX_ENV=test mix ecto.drop
-
-
-    echo "INFO Create test databases"
-    MIX_ENV=test mix ecto.create
-
-    echo "INFO Run test database migrations"
-    MIX_ENV=test mix ecto.migrate
+    init-mixenv "test"
 }
 
 
-
+# any - Run tests
 test() {
-    if [[ "$USE_DEV_CONTAINER" = true ]]
+    if [[ "$USE_CONTAINER" = true ]]
     then
         if [[ ! "$IN_CONTAINER" = true ]]
         then
@@ -549,7 +584,7 @@ test() {
             return 0
         fi
     fi
-    echo "INFO: Running tests..."
+    echo "INFO: Initialize and run tests..."
     echo "INFO: You can append test commands like ./$SCRIPT_FILE test path/file ... "
     # This is executed when:
     #   - the script is run inside a container
@@ -561,9 +596,9 @@ test() {
 }
 
 
-
+# any - Analyze the code
 lint() {
-    if [[ "$USE_DEV_CONTAINER" = true ]]
+    if [[ "$USE_CONTAINER" = true ]]
     then
         if [[ ! "$IN_CONTAINER" = true ]]
         then
@@ -584,9 +619,9 @@ lint() {
     mix credo $@
 }
 
-
+# any - Removes created data and initializes the environment again
 reset() {
-    clean-all
+    clean
     init
 }
 
@@ -596,33 +631,61 @@ reset() {
 #		Main script, settings and variables
 #
 ###########################################################################
-set -e              # default behaviour, exit if a function or command returns not 0
+set -e              # default behaviour, exit if a function or command doesn't return 0
 set -o pipefail     # 
 #set -x             # Only for debugging
 
 
-SCRIPT_ALIAS="swdev"                        # needs to be the same as in swdev-helper.sh
-ENV_FILE_DEV=development/dev.env            # env-file for the development environment, in .gitignore (contains secret)
+CURRENT_ENV_FILE=${SW_ENV_FILE:-development/.env}  # env file for the environment, in .gitignore (contains secret)
 ENV_FILE_TEMPLATE=development/template.env  # used as template to create the file above
-SCRIPT_FILE="swdev.sh"                      # overwritten by $SCRIPT_FILE in $ENV_FILE_DEV
-CON_PROJECT_DIR="/workspaces/sportyweb"     # folder where the sportyweb repo is located inside the container
+ELIXIR_VERSION=1.18.4                       # Used to check if the expected version matches the installed
+# commands from required packages for sportyweb 
+# from package:  --------- inotify-tools poppler-utils imagemagick ---------
+REQUIRED_PACKAGES="git gcc inotifywatch   pdfinfo       convert     ocrmypdf"
+# commands from recommended packages to be checked
+# from package:     awscli postgresql-client
+RECOMMENDED_PACKAGES="aws pg_dump"
+# needs to be the same as in swdev-helper.sh
+SCRIPT_ALIAS="swdev"                        
+SCRIPT_FILE="swdev.sh"
+
+COMPOSE_SERVICES="sportyweb-dev"
 
 # find the location of the script
 SCRIPTDIR=$( dirname -- "$( readlink -f -- "$0"; )";)
 
-
 # load vars from env file if it exists, if not create it
-if [ -f $ENV_FILE_DEV ]
+if [ -f $CURRENT_ENV_FILE ]
 then
-    source $ENV_FILE_DEV
+    source $CURRENT_ENV_FILE
 else
     create-devenvfile
-    source $ENV_FILE_DEV
+    source $CURRENT_ENV_FILE
+fi
+
+if [[ $USE_S3_STORAGE == "true" ]]
+then
+    COMPOSE_SERVICES="$COMPOSE_SERVICES s3"
 fi
 
 # command that is used to run commands inside the container
-COMMAND_TO_CON="$CONTAINER_TOOL exec -w $CON_PROJECT_DIR -it $DEV_CONTAINER_NAME"
+COMMAND_TO_CON="$CONTAINER_TOOL exec -w $CONTAINER_PROJECT_DIR -it $DEV_CONTAINER_NAME"
 
+FUNCTION_LIST=$(grep "^[a-zA-Z-]*() {" "$SCRIPT_FILE" | sed 's/[^a-zA-Z-]//g' | tr '\n' ' ' )
 
+read -r -a functions <<< $FUNCTION_LIST
+for function in "${functions[@]}"
+do
+    if [[ "$1" == $function ]]
+    then
+         
+        "$@"
+        exit 0
+    fi
+done
+echo "ERROR: $@ is no function or no function specified!"
+echo "       use './$SCRIPT_FILE help' to view all functions!"
+echo "       or read the beginning of './$SCRIPT_FILE' for information."
+exit 1
 # the first arg calls the function. Example ./swdev.sh init
-"$@"
+#"$@"

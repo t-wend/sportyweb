@@ -1,4 +1,8 @@
-# beschreibung
+###############################################################################
+#
+# Sportyweb Containerfile
+#
+###############################################################################
 
 # Official image for elixir, based on erlang and debian
 FROM docker.io/library/elixir:1.18.4-otp-27 AS swbase
@@ -8,12 +12,7 @@ FROM docker.io/library/elixir:1.18.4-otp-27 AS swbase
 # Prevents dialogs asking for user presence while installing packages with apt
 ENV DEBIAN_FRONTEND=noninteractive
 
-
-# Sets the user for the following commands to 'root'.
-# It's the default behavior and here only for clarification.
-USER root
-
-# General dependencies 
+# Install general dependencies 
 # inotify-tools is recommended be installed for phoenix
 # build-essential is a meta package to compile c,
 #   its required for the elixir package "argon2_elixir"
@@ -24,34 +23,46 @@ RUN apt update && apt-get install -y --no-install-recommends \
 
 
 
-# Dependencies for the document-management-module
+# Install dependencies for the document-management-module
 # imagemagick: generates thumbnails;
 # ocrmypdf: enables full-text search on scanned files
-# poppler-utils: 
+# poppler-utils: pdftotext is used to extract text from pdf files
 RUN apt update && apt-get install -y --no-install-recommends \
     imagemagick \ 
     ocrmypdf \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Exposes the port to be used by the webserver
-EXPOSE 4000
+# Informs the Container Engine about the port used by the webserver
+EXPOSE 4000/tcp
 
 
 
-# Sets args for the development user created in the next step
+# Sets args for the user created in the next step
 ARG USERNAME=sportyweb
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
 
-# Creates the user that is used for development activities
+# Creates the user that is used to run or develop sportyweb 
 RUN groupadd --gid $USER_GID $USERNAME && \
     useradd --uid $USER_UID --gid $USER_GID -m -d /workspaces -s /bin/bash $USERNAME
 
 
-USER $USERNAME
 
-WORKDIR /workspaces
+###########################################################
+#
+# test container
+#
+
+FROM swbase AS swtest
+
+# There are some restrictions for Containerfiles for GitHub Actions
+#   https://docs.github.com/en/actions/reference/workflows-and-actions/dockerfile-support
+#   the user root is required
+USER root
+
+# ....
+
 
 ###########################################################
 #
@@ -59,48 +70,55 @@ WORKDIR /workspaces
 #
 FROM swbase AS swdev
 
-# switching temporarily back to root
-USER root
-
 # Development specific packages
 # bash-completion adds autocomplete features to the bash shell
-# postgresql-client to provide the commands "psql" or "pg_dump"
+# postgresql-client to provide the commands "psql" or "pg_dump", required for "mix ecto.dump"
 # nano is a small editor to quickly change files outside the workspace, inside the container
+# awscli provides a s3 cli client
 RUN apt update && apt-get install -y --no-install-recommends \
     bash-completion \
     postgresql-client \
-    nano \
+    nano \ 
+    awscli \
     && rm -rf /var/lib/apt/lists/*
 
 
+# switching to the unprivileged user
+USER sportyweb
 
+WORKDIR /workspaces
 
-
-# switching back to the unprivileged user
-ARG USERNAME=sportyweb
-USER $USERNAME
-
+# add execution of swdev-helper.sh to .bashrc
 RUN echo "source /workspaces/sportyweb/swdev-helper.sh > /dev/null " >> /workspaces/.bashrc
 
-
+# Install hex.pm for the user
+RUN mix local.hex --force
 
 # starts a dummy-process so the container is running, 
-# even when the webserver is not started.
-# 
+#  even when the webserver is not started, so that you can
+#  run a shell inside the container.
+# SIGTERM isnt enough to end the sleep process under podman 
 STOPSIGNAL SIGKILL
 CMD [ "sleep", "infinity" ]
 
 
 
-FROM swbase AS swprod
+
+######################################
+# 
+# Proposal for a prod container
+#
+#FROM swbase AS swprod
+
+# USER sportyweb
 
 # Download sportyweb release
 # RUN ...
 
-ENV PHX_SERVER=true
-ENV MIX_ENV=prod
+#ENV PHX_SERVER=true
+#ENV MIX_ENV=prod
 
 
 # starts the webserver
 # 
-#CMD [ "/path/to/webserver", "infinity" ]
+#CMD [ "/path/to/webserver", "arg" ]
