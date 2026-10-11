@@ -118,9 +118,9 @@ check-con-engine() {
 check-con-compose() {
     if ! command -v podman-compose &> /dev/null
     then
-        if ! command -v docker-compose &> /dev/null
+        if ! command -v docker compose &> /dev/null
         then 
-            echo "ERROR podman-compose or docker-compose is required!"
+            echo "ERROR podman-compose or docker compose is required!"
             return 1  
         fi
     fi
@@ -238,7 +238,6 @@ up() {
 # CH - Stop all containers and remove them
 down() {
     check-con-dev-image
-    #check-con-dev-running
     $COMPOSE_PROVIDER -f $COMPOSE_FILE_PATH down
 }
 
@@ -252,14 +251,13 @@ restart() {
 enter() {
     check-con-dev-running
     $CONTAINER_TOOL exec -w /workspaces/sportyweb -it $DEV_CONTAINER_NAME /bin/bash 
-    #$COMPOSE_PROVIDER -f ./development/compose.yml exec -w /workspaces/sportyweb sportyweb-dev bash 
-}
+    }
 
 # CH - Start a root shell inside the container
 enter-root() {
     check-con-dev-running
     $CONTAINER_TOOL exec -w /workspaces/sportyweb -it --user root $DEV_CONTAINER_NAME /bin/bash 
-    #$COMPOSE_PROVIDER -f ./development/compose.yml exec -w /workspaces/sportyweb sportyweb-dev bash 
+    
 }
 
 # CH - Sends a command passed as arg ($*) to the development container
@@ -293,6 +291,11 @@ create-devenvfile() {
         # Replaces the value of S3_SECRET_KEY
         sed -i "s~^#S3_SECRET_KEY=.*~S3_SECRET_KEY=$NEW_SECRET~g" $SCRIPTDIR/$CURRENT_ENV_FILE
         
+        NEW_SECRET=$(LC_ALL=C openssl rand --base64 64 | sed -n '1p' | cut -c -64)
+        # Replaces the value of POSTGRES_PASSWORD
+        sed -i "s~^#POSTGRES_PASSWORD=.*~POSTGRES_PASSWORD=$NEW_SECRET~g" $SCRIPTDIR/$CURRENT_ENV_FILE
+        
+
         echo "INFO Secrets generated in $SCRIPTDIR/$CURRENT_ENV_FILE"
 
     else
@@ -508,7 +511,7 @@ init-con() {
     con-cmd "/workspaces/sportyweb/$SCRIPT_FILE check-sw-required"
     con-cmd "/workspaces/sportyweb/$SCRIPT_FILE init-dev"
     con-cmd "/workspaces/sportyweb/$SCRIPT_FILE init-test"
-    con-cmd "/workspaces/sportyweb/$SCRIPT_FILE mix phx.server"
+    con-cmd "mix phx.server"
     return 0 # exit without proceeding
 }
 
@@ -649,7 +652,7 @@ RECOMMENDED_PACKAGES="aws pg_dump"
 SCRIPT_ALIAS="swdev"                        
 SCRIPT_FILE="swdev.sh"
 
-COMPOSE_SERVICES="sportyweb-dev"
+COMPOSE_SERVICES="sportyweb-dev postgresql"
 
 # find the location of the script
 SCRIPTDIR=$( dirname -- "$( readlink -f -- "$0"; )";)
@@ -671,8 +674,12 @@ fi
 # command that is used to run commands inside the container
 COMMAND_TO_CON="$CONTAINER_TOOL exec -w $CONTAINER_PROJECT_DIR -it $DEV_CONTAINER_NAME"
 
+# A list of all functions in this script
 FUNCTION_LIST=$(grep "^[a-zA-Z-]*() {" "$SCRIPT_FILE" | sed 's/[^a-zA-Z-]//g' | tr '\n' ' ' )
 
+#                                                     ARG $1
+# the first arg calls the function. Example ./swdev.sh init
+# Checks if the "Command" is in the function list, else shows an error
 read -r -a functions <<< $FUNCTION_LIST
 for function in "${functions[@]}"
 do
@@ -687,5 +694,3 @@ echo "ERROR: $@ is no function or no function specified!"
 echo "       use './$SCRIPT_FILE help' to view all functions!"
 echo "       or read the beginning of './$SCRIPT_FILE' for information."
 exit 1
-# the first arg calls the function. Example ./swdev.sh init
-#"$@"

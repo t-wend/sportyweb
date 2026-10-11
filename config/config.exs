@@ -50,7 +50,7 @@ config :sportyweb, Sportyweb.Scheduler,
 config :sportyweb, Sportyweb.Documents,
   storage_backend: Sportyweb.Documents.Storage.Local, # Either .Local or .S3
   upload_dir: "uploads/documents", # Upload dir if Local backend is used
-  s3_bucket: "dboth", # S3 Bucket if S3 backend is used
+  s3_bucket: "sportyweb-bucket", # S3 Bucket if S3 backend is used
   allowed_content_types: ["application/pdf"],
   text_extractor_lang: "deu"
 

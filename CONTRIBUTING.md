@@ -45,13 +45,14 @@ Begründete Abweichungen von den nachfolgend geschilderten Abläufen sind natür
 
 Um an Sportyweb mitzuwirken, muss das Projekt auf dem lokalen System zum Laufen gebracht werden.
 Dafür notwendig sind die Programmiersprachen [Erlang](https://www.erlang.org/) und [Elixir](https://elixir-lang.org/) (Elixir basiert auf Erlang, deshalb diese Abhängigkeit), sowie das Datenbanksystem [PostgreSQL](https://www.postgresql.org/).
-Eine Installationsanleitung mit der Angabe der jeweils notwendigen Version ist in der [README](https://github.com/Lehrstuhl-BWL-EvIS/sportyweb/blob/development/README.md)-Datei zu finden, wobei spezifische Unterschiede bzgl.
+Diese und weitere Abhängigkeiten können mithilfe einer containerbasierte Entwicklungsumgebung bereitgestellt werden.
+Eine Installationsanleitung ist in der [./development/README](./development/README.md)-Datei zu finden, wobei spezifische Unterschiede bzgl.
 des eingesetzten Betriebssystems zu beachten sind.
 
-Die notwendigen Informationen zur Konfiguration der PostgreSQL-Datenbank für die Entwicklungsumgebung sind ebenfalls in der README, aber auch in folgender Datei hinterlegt: <https://github.com/Lehrstuhl-BWL-EvIS/sportyweb/blob/development/config/dev.exs>
+Falls die containerbasierte Entwicklungsumbebung verwendet wird, ist keine weiter Konfiguration notwendig, falls nicht sind notwendige Informationen zur Konfiguration der PostgreSQL-Datenbank für die Entwicklungsumgebung sind ebenfalls in der README, aber auch in folgender Datei hinterlegt: <https://github.com/Lehrstuhl-BWL-EvIS/sportyweb/blob/development/config/dev.exs>
 
-Außerdem notwendig sind die Installation und Konfiguration von Git und GPG, um verifizierte Commits zu erstellen.
-Auch hier ist die entsprechende Anleitung der README-Datei zu entnehmen.
+Außerdem notwendig sind die Installation und Konfiguration von Git und GPG, um [verifizierte Commits](https://docs.github.com/en/authentication/managing-commit-signature-verification) zu erstellen.
+
 
 Das Sportyweb-Projekt kann mit `git clone` in einen beliebigen Unterordner auf dem eigenen System gepackt werden:
 

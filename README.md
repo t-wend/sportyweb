@@ -34,7 +34,35 @@ The research project examines the domain of clubs, in particular sports clubs, w
 > [!WARNING]
 > This project is a work in progress and not yet ready for production ⚡
 
-### Prerequisites
+We recommend the use of the container-based environment, because it provides a pre-configured environment that comes with all dependencies installed. 
+
+### Container-based enviroment
+
+requirements:
+- Podman or Docker
+- Bash
+- Git
+
+If you use Windows, install podman (or docker) in WSL2 and take a look at the detailed instructions at [./development/README.md](./development/README.md)
+
+
+Instuctions:
+
+1. clone the repository to your preferred location
+2. (if you want to use docker instead of podman, run ```./swdev.sh create-devenvfile``` and change the Values of CONTAINER_TOOL and COMPOSE_PROVIDER)
+2. run ```./swdev.sh init```, this creates the containers, loads and compiles packages, sets up the DB and starts the webserver (exit with Ctrl+C, A)
+4. Now the webserver should be accessible at <http://localhost:4000>
+
+Now you can start developing or enter the container and run more commands:
+
+- run ```-/swdev.sh enter``` to attach your shell to the container.
+- then run some command, like ```mix ... ``` or use the alias 'swdev' with tab-completion inside the container!
+
+
+Some functions from the script 'swdev.sh' are only available on a host with podman or docker, while others have to be used inside a container. To get an overview run ```./swdev.sh help```
+
+### Install on Host
+#### Prerequisites
 
 Current versions of:
 
@@ -45,7 +73,7 @@ Current versions of:
 
 We recommend using a version manager to install Elixir & Erlang: https://elixir-lang.org/install.html#version-managers
 
-### Optional prerequisites
+#### Optional prerequisites
 
 These are only required if you want to enable thumbnail generation and fulltext extraction:
 
@@ -55,7 +83,7 @@ These are only required if you want to enable thumbnail generation and fulltext 
 You can install all of them on Debian/Ubuntu with: 
 `sudo apt install imagemagick ocrmypdf poppler-utils`
 
-### Start the application
+#### Start the application
 
 - Install dependencies with `mix deps.get`
 - Change the development database name ("sportyweb_dev") in `sportyweb/config/dev.exs` if necessary

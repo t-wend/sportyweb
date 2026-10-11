@@ -33,6 +33,14 @@ RUN apt update && apt-get install -y --no-install-recommends \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
+# This policy is set by default, but imagemagick cant generate a thumbnail.
+# This was set to address a security vulnerability in GhostScript, 
+#  a dependency of imagemagick, but was fixed in version 9.24
+# https://www.kb.cert.org/vuls/id/332928/
+# currently installed is >10.00.0
+RUN sed -i 's~<policy domain="coder" rights="none" pattern="PDF" />~~g' /etc/ImageMagick-6/policy.xml
+
+
 # Informs the Container Engine about the port used by the webserver
 EXPOSE 4000/tcp
 
